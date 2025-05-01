@@ -10,56 +10,80 @@ const proxy = httpProxy.createProxyServer();
 // Environment variables
 const PORT = process.env.PORT || 3001;
 const USER_SERVICE_URL = process.env.USER_SERVICE_URL || 'http://localhost:3002';
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
+const JWT_SECRET = process.env.JWT_SECRET || 'jasonwebtoken';
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+app.use(cors({
+  exposedHeaders: ['x-user-id', 'x-user-role']
+}));
 
 // Authentication middleware for the gateway
 const authenticate = (req, res, next) => {
-    const authHeader = req.header('Authorization');
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ 
-            status: false,
-            message: 'Access Denied: No token provided' 
-        });
-    }
+  const authHeader = req.header('Authorization');
+  
+  if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ 
+          status: false,
+          message: 'Access Denied: No token provided' 
+      });
+  }
 
-    const token = authHeader.split(' ')[1];
-    
-    try {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        req.user = decoded;
-        next();
-    } catch (error) {
-        let message = 'Invalid Token';
-        if (error.name === 'TokenExpiredError') {
-            message = 'Token expired';
-        } else if (error.name === 'JsonWebTokenError') {
-            message = 'Malformed token';
-        }
-        return res.status(401).json({ status: false, message });
-    }
+  const token = authHeader.split(' ')[1].trim();
+  
+  try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      req.user = decoded;
+      
+      req.headers['x-user-id'] = decoded.id;
+      req.headers['x-user-role'] = decoded.role;
+      
+      next();
+  } catch (error) {
+      console.error('Token verification failed:', error.message);
+      const message = error.name === 'TokenExpiredError' ? 'Token expired' :
+                     error.name === 'JsonWebTokenError' ? 'Malformed token' : 
+                     'Invalid Token';
+      return res.status(401).json({ status: false, message });
+  }
 };
-
-// Route handlers
-app.post('/auth/register', (req, res) => {
-    proxy.web(req, res, { target: USER_SERVICE_URL });
-});
 
 app.post('/auth/login', (req, res) => {
     proxy.web(req, res, { target: USER_SERVICE_URL });
 });
 
+app.post('/auth/register', (req, res) => {
+  proxy.web(req, res, { target: USER_SERVICE_URL });
+});
+
 // Protected routes
-app.use('/users', authenticate, (req, res) => {
+app.get('/users', authenticate, (req, res) => {
     proxy.web(req, res, { target: USER_SERVICE_URL });
 });
 
-app.use('/auth/profile', authenticate, (req, res) => {
-    proxy.web(req, res, { target: USER_SERVICE_URL });
+app.put('/users/:id/approve', authenticate, (req, res) => {
+  console.log(`Forwarding approve request for user ${req.params.id}`);
+  console.log('Headers being forwarded:', req.headers);
+  
+  req.headers['x-user-id'] = req.user.id;
+  req.headers['x-user-role'] = req.user.role;
+  
+  proxy.web(req, res, { 
+    target: USER_SERVICE_URL,
+    headers: {
+      'x-user-id': req.user.id,
+      'x-user-role': req.user.role
+    }
+  });
+});
+
+app.get('/auth/profile', authenticate, (req, res) => {
+  console.log('Forwarding profile request to user service');
+  proxy.web(req, res, { 
+      target: USER_SERVICE_URL,
+      headers: {
+          'x-user-id': req.user.id,
+          'x-user-role': req.user.role
+      }
+  });
 });
 
 // Health check endpoint

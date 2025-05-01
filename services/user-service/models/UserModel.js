@@ -12,6 +12,7 @@ const UserSchema = new mongoose.Schema({
     },
     // Restaurant information for restaurant managers
     restaurantInfo: {
+        id: { type: String, unique: true },
         name: { type: String },
         address: { type: String }
     },
@@ -36,7 +37,9 @@ const UserSchema = new mongoose.Schema({
         vehicleDetails: {
             model: { type: String },
             licensePlate: { type: String }
-        }
+        },
+        driverLicense:{type:String},
+        nicNumber: {type:String}
     }
 }, { timestamps: true });
 

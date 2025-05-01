@@ -73,38 +73,43 @@ router.get("/", async (req, res) => {
     }
 });
 
-// Approve a user
-router.put("/:id/approve", authMiddleware, adminMiddleware, async (req, res) => {
+// In user service routes
+router.get('/pending', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const user = await User.findById(req.params.id);
-
-        if (!user) {
-            return res.status(404).json({ error: "User not found" });
-        }
-
-        // Check if user is already approved
-        if (user.isApproved) {
-            return res.status(400).json({ error: "User is already approved" });
-        }
-
-        user.isApproved = true;
-        await user.save();
-
-        res.status(200).json({ 
-            status: true,
-            message: "User approved successfully",
-            user: {
-                _id: user._id,
-                isApproved: user.isApproved
-            }
-        });
+      const pendingUsers = await User.find({ 
+        isApproved: false,
+        role: { $ne: 'customer' } 
+      }).select('-password');
+      res.json(pendingUsers);
     } catch (error) {
-        console.error("Error approving user:", error);
-        res.status(500).json({ 
-            status: false,
-            error: "Internal Server Error",
-            message: error.message 
-        });
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  router.put('/:id/approve', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+      console.log('Approving user ID:', req.params.id); // Debug log
+      console.log('Request headers:', req.headers); // Debug log
+      
+      const user = await User.findByIdAndUpdate(
+        req.params.id,
+        { isApproved: true },
+        { new: true }
+      ).select('-password');
+      
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      console.log('Approved user:', user); // Debug log
+      res.json({ 
+        status: true,
+        message: 'User approved successfully',
+        user 
+      });
+    } catch (error) {
+      console.error('Approval error:', error); // Debug log
+      res.status(500).json({ error: error.message });
     }
 });
 

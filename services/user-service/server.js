@@ -14,15 +14,14 @@ app.use(express.json());
 
 // MongoDB connection
 mongoose.connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
+   
 })
     .then(() => console.log("✅ MongoDB connected"))
     .catch((err) => console.error("⚠️ MongoDB connection error:", err));
 
 // Routes
 app.use("/auth", require("./routes/authRoutes"));
-app.use("/api/users", require("./routes/userRoute"));
+app.use("/users", require("./routes/userRoute"));
 
 // Check for MongoDB connection errors
 mongoose.connection.on("error", (err) => {
