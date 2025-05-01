@@ -5,7 +5,7 @@ const axios = require('axios');
 
 // Configuration - Store these in environment variables in production
 const USER_SERVICE_URL = process.env.USER_SERVICE_URL || 'http://localhost:5002';
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret'; // Must match user service
+const JWT_SECRET = process.env.JWT_SECRET || 'jasonwebtoken'; // Must match user service
 
 exports.authMiddleware = async (req, res, next) => {
   try {

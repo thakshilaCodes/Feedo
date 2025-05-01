@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const menuController = require('../controllers/menuController');
 const multer = require('multer');
+const restaurantOrderController = require('../controllers/restaurantOrderController')
 
 // File upload config
 const storage = multer.diskStorage({
@@ -26,5 +27,7 @@ router.post('/orders/:orderId/reject', restaurantController.rejectOrder);
 router.put('/orders/:orderId/status', restaurantController.updateOrderStatus);
 router.post('/orders/:orderId/request-confirmation', restaurantOrderController.handleOrderConfirmation);*/
 
+// Add this new route above the module.exports
+router.post('/orders', restaurantOrderController.saveOrder);
 
 module.exports = router;

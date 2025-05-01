@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Order = require('../models/Order');
+const restaurantService = require('../services/restaurantService');
 
 // Create a new order
 exports.createOrder = async (req, res) => {
@@ -12,7 +13,6 @@ exports.createOrder = async (req, res) => {
       paymentMethod
     } = req.body;
 
-    // Use authenticated user's ID as customerId
     const customerId = req.user._id;
 
     const totalAmount = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -30,6 +30,13 @@ exports.createOrder = async (req, res) => {
 
     const savedOrder = await order.save();
 
+    // Notify restaurant service
+    try {
+      await restaurantService.notifyRestaurantOfOrder(savedOrder);
+    } catch (notifyErr) {
+      console.warn('Order created but failed to notify restaurant service:', notifyErr.message);
+    }
+
     res.status(201).json({ success: true, data: savedOrder });
 
   } catch (error) {
@@ -42,17 +49,15 @@ exports.createOrder = async (req, res) => {
 exports.getCustomerOrders = async (req, res) => {
   try {
     const { customerId } = req.params;
-    
-    // Validate customerId format
+
     if (!mongoose.Types.ObjectId.isValid(customerId)) {
       return res.status(400).json({ success: false, message: 'Invalid customer ID format' });
     }
-    
-    // Security check - users can only access their own orders
-    if (req.user.role !== 'admin' && req.user._id !== customerId) {
+
+    if (req.user.role !== 'admin' && req.user._id.toString() !== customerId) {
       return res.status(403).json({ success: false, message: 'Access denied: You can only view your own orders' });
     }
-    
+
     const orders = await Order.find({ customerId }).sort({ createdAt: -1 });
 
     res.status(200).json({ success: true, count: orders.length, data: orders });
@@ -66,24 +71,21 @@ exports.getCustomerOrders = async (req, res) => {
 exports.getOrderById = async (req, res) => {
   try {
     const { id } = req.params;
-    
-    // Validate order ID format
+
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ success: false, message: 'Invalid order ID format' });
     }
-    
+
     const order = await Order.findById(id);
 
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
-    // Security check - customers can only access their own orders
-    // Restaurant managers can only access orders for their restaurant
-    if (
-      req.user.role === 'customer' && order.customerId.toString() !== req.user._id.toString() ||
-      req.user.role === 'restaurantManager' && order.restaurantId.toString() !== req.user.restaurantInfo._id.toString()
-    ) {
+    const isCustomer = req.user.role === 'customer' && order.customerId.toString() !== req.user._id.toString();
+    const isManager = req.user.role === 'restaurantManager' && order.restaurantId.toString() !== req.user.restaurantInfo._id.toString();
+
+    if (isCustomer || isManager) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
@@ -99,12 +101,11 @@ exports.updateOrderStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
-    
-    // Validate order ID format
+
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ success: false, message: 'Invalid order ID format' });
     }
-    
+
     const validStatuses = ['CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'];
 
     if (!validStatuses.includes(status)) {
@@ -116,7 +117,6 @@ exports.updateOrderStatus = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
-    // Security check - restaurant managers can only update orders for their restaurant
     if (order.restaurantId.toString() !== req.user.restaurantInfo._id.toString()) {
       return res.status(403).json({ success: false, message: 'Access denied: Not your restaurant order' });
     }
@@ -136,19 +136,17 @@ exports.modifyOrder = async (req, res) => {
   try {
     const { id } = req.params;
     const { items, deliveryAddress, contactPhone } = req.body;
-    
-    // Validate order ID format
+
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ success: false, message: 'Invalid order ID format' });
     }
-    
+
     const order = await Order.findById(id);
 
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
-    // Security check - customers can only modify their own orders
     if (order.customerId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ success: false, message: 'Access denied: Not your order' });
     }
@@ -177,19 +175,17 @@ exports.modifyOrder = async (req, res) => {
 exports.cancelOrder = async (req, res) => {
   try {
     const { id } = req.params;
-    
-    // Validate order ID format
+
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ success: false, message: 'Invalid order ID format' });
     }
-    
+
     const order = await Order.findById(id);
 
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
-    // Security check - customers can only cancel their own orders
     if (order.customerId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ success: false, message: 'Access denied: Not your order' });
     }
