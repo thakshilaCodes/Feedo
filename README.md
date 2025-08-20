@@ -39,19 +39,15 @@ The system is built using a **microservices-based architecture** with the follow
    - Routes client requests to the correct microservice.  
    - Handles authentication, rate-limiting, and load balancing.  
 
-**Architecture Diagram:**
+## 🏗️ Architecture Overview
 
-         +-------------------+
-        |      Client       |
-        +-------------------+
-                 |
-                 v
-        +-------------------+
-        |    API Gateway    |
-        +-------------------+
-         |       |       |
-         v       v       v
-   User Svc   Order Svc  Restaurant Svc
-         |       |       |
-      Payment Svc  Delivery Svc
+### Mermaid Diagram (for GitHub README)
 
+```mermaid
+graph TD
+    A[Frontend: React + TailwindCSS] --> B[API Gateway: Node/Express]
+    B --> C[User Service: Node/Express + MongoDB]
+    B --> D[Order Service: Node/Express + MongoDB]
+    B --> E[Restaurant Service: Node/Express + MongoDB]
+    C --> F[Payment Service: Node/Express + Payment Gateway]
+    D --> G[Delivery Service: Node/Express + Geo Tracking]
